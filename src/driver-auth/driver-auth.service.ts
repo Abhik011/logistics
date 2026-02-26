@@ -1,18 +1,40 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt';   
+import { JwtService } from '@nestjs/jwt';
+import { CreateDriverProfileDto } from './driver-profile.dto';
 
 @Injectable()
 export class DriverAuthService {
   constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
   ) {}
 
-  // ✅ REGISTER
-  async registerFullProfile(data: any) {
-    const hashed = await bcrypt.hash(data.password, 10);
+  /* ================= REGISTER ================= */
+
+  async registerFullProfile(
+    data: CreateDriverProfileDto,
+  ) {
+    // Check if driver already exists
+    const existing = await this.prisma.driver.findUnique({
+      where: { phone: data.phone },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        'Driver with this phone already exists',
+      );
+    }
+
+    const hashed = await bcrypt.hash(
+      data.password,
+      10,
+    );
 
     const driver = await this.prisma.driver.create({
       data: {
@@ -23,17 +45,23 @@ export class DriverAuthService {
       },
     });
 
-    return driver;
+    return {
+      message: 'Driver registered successfully',
+      driver,
+    };
   }
 
-  // ✅ LOGIN
+  /* ================= LOGIN ================= */
+
   async login(phone: string, password: string) {
     const driver = await this.prisma.driver.findUnique({
       where: { phone },
     });
 
     if (!driver) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(
+        'Invalid credentials',
+      );
     }
 
     const isValid = await bcrypt.compare(
@@ -42,7 +70,9 @@ export class DriverAuthService {
     );
 
     if (!isValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(
+        'Invalid credentials',
+      );
     }
 
     const token = this.jwt.sign({
@@ -52,19 +82,41 @@ export class DriverAuthService {
 
     return {
       accessToken: token,
-      driver,
+      driver: {
+        id: driver.id,
+        name: driver.name,
+        phone: driver.phone,
+        licenseNo: driver.licenseNo,
+      },
     };
   }
 
-  // ✅ GET PROFILE
+  /* ================= GET PROFILE ================= */
+
   async getProfile(driverId: string) {
     return this.prisma.driver.findUnique({
       where: { id: driverId },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        licenseNo: true,
+        licenseExpiry: true,
+        createdAt: true,
+      },
     });
   }
 
-  // ✅ UPDATE PROFILE
-  async updateProfile(driverId: string, data: any) {
+  /* ================= UPDATE PROFILE ================= */
+
+  async updateProfile(
+    driverId: string,
+    data: {
+      name?: string;
+      licenseNo?: string;
+      licenseExpiry?: string;
+    },
+  ) {
     return this.prisma.driver.update({
       where: { id: driverId },
       data: {
