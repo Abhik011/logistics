@@ -1,0 +1,433 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+  OPERATIONS
+  FINANCE
+  DRIVER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+
+  bookings Booking[]
+}
+
+model Customer {
+  id           String  @id @default(uuid())
+  name         String
+  gstNumber    String?
+  panNumber    String?
+  creditLimit  Float?
+  paymentTerms String?
+  state        String?
+  isActive     Boolean @default(true)
+
+  contacts      CustomerContact[]
+  locations     CustomerLocation[]
+  bookings      Booking[] // 👈 ADD THIS
+  rateContracts RateContract[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+}
+
+model CustomerContact {
+  id          String  @id @default(uuid())
+  name        String
+  email       String?
+  phone       String?
+  designation String?
+
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+
+  createdAt DateTime @default(now())
+}
+
+model CustomerLocation {
+  id          String @id @default(uuid())
+  addressLine String
+  city        String
+  state       String
+  pincode     String
+
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+
+  createdAt DateTime @default(now())
+}
+
+enum BookingStatus {
+  CREATED
+  PLANNED
+  DISPATCHED
+  IN_TRANSIT
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  bookingNumber   String        @unique
+  serviceType     String
+  pickupAddress   String
+  deliveryAddress String
+  weight          Float
+  volume          Float
+  commodity       String
+  status          BookingStatus @default(CREATED)
+  distanceKm      Float?
+  revenue         Float? // ✅ ADD THIS
+  actualCost      Float?
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  customerId      String
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  trip   Trip?   @relation(fields: [tripId], references: [id])
+  tripId String?
+
+  route   Route?  @relation(fields: [routeId], references: [id])
+  routeId String?
+
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  invoiceId String?
+
+  pod       Pod?
+  claims    Claim[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TripStatus {
+  PLANNED
+  DISPATCHED
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+model Trip {
+  id         String     @id @default(uuid())
+  tripNumber String     @unique
+  startDate  DateTime
+  endDate    DateTime?
+  status     TripStatus @default(PLANNED)
+
+  bookings Booking[]
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+
+  totalDistanceKm Float?
+  // ✅ ADD THESE LINES
+  locations       TripLocation[]
+  expenses        TripExpense[]
+  fuelEntries     FuelEntry[]
+
+  estimatedCost Float?
+  actualCost    Float?
+  revenue       Float?
+  profit        Float?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  invoiceId String?
+  invoices  Invoice[]
+}
+
+model TripLocation {
+  id     String @id @default(uuid())
+  trip   Trip   @relation(fields: [tripId], references: [id])
+  tripId String
+
+  latitude  Float
+  longitude Float
+  speed     Float?
+  heading   Float?
+
+  createdAt DateTime @default(now())
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+}
+
+model Invoice {
+  id            String @id @default(uuid())
+  invoiceNumber String @unique
+
+  totalAmount Float
+
+  cgstAmount Float?
+  sgstAmount Float?
+  igstAmount Float?
+  gstPercent Float  @default(18)
+
+  tdsAmount Float? @default(0)
+
+  grandTotal    Float
+  netReceivable Float?
+
+  paidAmount Float         @default(0)
+  status     InvoiceStatus @default(DRAFT)
+
+  dueDate   DateTime?
+  isOverdue Boolean   @default(false)
+
+  tripId String? @unique
+  trip   Trip?   @relation(fields: [tripId], references: [id])
+
+  bookings Booking[]
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  amount      Float
+  paymentDate DateTime
+  referenceNo String?
+  notes       String?
+
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  invoiceId String
+
+  createdAt DateTime @default(now())
+}
+
+// ------------------------------------
+// Fleet Masters: Vehicle & Driver
+// ------------------------------------
+
+enum VehicleOwnership {
+  OWN
+  MARKET
+  ATTACHED
+}
+
+model Vehicle {
+  id              String           @id @default(uuid())
+  registrationNo  String           @unique
+  ownership       VehicleOwnership
+  capacityTons    Float?
+  bodyType        String?
+  fuelType        String?
+  odometerReading Int?
+  isActive        Boolean          @default(true)
+
+  insuranceExpiry DateTime?
+  fitnessExpiry   DateTime?
+  permitExpiry    DateTime?
+  pucExpiry       DateTime?
+  driverRates     DriverRate[]
+
+  trips       Trip[]
+  fuelEntries FuelEntry[]
+  expenses    TripExpense[]
+
+  costPerKm   Float?
+  capacityCbm Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Driver {
+  id                String       @id @default(uuid())
+  name              String
+  phone             String?      @unique
+  password          String
+  licenseNo         String?
+  licenseExpiry     DateTime?
+  address           String?
+  emergencyPhone    String?
+  commissionPercent Float?
+  walletBalance     Float        @default(0)
+  driverRates       DriverRate[]
+  isActive          Boolean      @default(true)
+  vehicle  Vehicle?
+  trips Trip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DriverRate {
+  id       String @id @default(uuid())
+  driver   Driver @relation(fields: [driverId], references: [id])
+  driverId String
+
+  route   Route?  @relation(fields: [routeId], references: [id])
+  routeId String?
+
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicleId String?
+
+  ratePerKm  Float?
+  ratePer4Km Float?
+
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+}
+
+// ------------------------------------
+// Routes / Lanes & Contracts
+// ------------------------------------
+
+model Route {
+  id                  String       @id @default(uuid())
+  code                String       @unique
+  origin              String
+  destination         String
+  distanceKm          Float?
+  standardTransitDays Int?
+  driverRates         DriverRate[]
+  bookings            Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RateContract {
+  id         String   @id @default(uuid())
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+
+  serviceType String
+  origin      String?
+  destination String?
+
+  ratePerTon           Float?
+  ratePerKm            Float?
+  flatRate             Float?
+  fuelSurchargePercent Float?
+
+  validFrom DateTime
+  validTo   DateTime?
+  isActive  Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------
+// Trip Expenses & Fuel
+// ------------------------------------
+
+enum TripExpenseType {
+  FUEL
+  TOLL
+  LOADING
+  UNLOADING
+  RTO
+  PARKING
+  DRIVER_ALLOWANCE
+  OTHER
+}
+
+model TripExpense {
+  id     String @id @default(uuid())
+  trip   Trip   @relation(fields: [tripId], references: [id])
+  tripId String
+
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicleId String?
+
+  type        TripExpenseType
+  amount      Float
+  description String?
+  expenseDate DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FuelEntry {
+  id     String  @id @default(uuid())
+  trip   Trip?   @relation(fields: [tripId], references: [id])
+  tripId String?
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  litres       Float
+  ratePerLitre Float
+  amount       Float
+  odometer     Int?
+  entryDate    DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------
+// POD & Claims
+// ------------------------------------
+
+model Pod {
+  id        String  @id @default(uuid())
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  bookingId String  @unique
+
+  podNumber    String?
+  receivedBy   String?
+  receivedDate DateTime?
+  remarks      String?
+
+  createdAt DateTime @default(now())
+}
+
+enum ClaimStatus {
+  OPEN
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SETTLED
+}
+
+model Claim {
+  id        String  @id @default(uuid())
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  bookingId String
+
+  claimType String
+  amount    Float
+  status    ClaimStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
