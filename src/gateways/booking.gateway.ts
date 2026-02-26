@@ -7,15 +7,17 @@ import { Server } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: true,
+    credentials: true,
   },
+  transports: ['websocket'],   // 🚀 force websocket only
 })
 export class BookingGateway implements OnGatewayInit {
   @WebSocketServer()
   server: Server;
 
   afterInit() {
-    console.log('✅ WebSocket Gateway Initialized');
+    console.log('✅ Booking WebSocket Gateway Initialized');
   }
 
   emitBookingCreated(booking: any) {
