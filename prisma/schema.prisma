@@ -272,7 +272,7 @@ model Driver {
   walletBalance     Float        @default(0)
   driverRates       DriverRate[]
   isActive          Boolean      @default(true)
-  vehicle  Vehicle?
+  
   trips Trip[]
 
   createdAt DateTime @default(now())
