@@ -7,14 +7,14 @@ import { BookingStatus, TripStatus, } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { GoogleMapsService } from '../common/google-maps.service';
 import { TripsService } from '../trips/trips.service';
-import { BookingGateway } from '../gateways/booking.gateway';
+import { AppGateway } from '../gateways/booking.gateway';
 
 @Injectable()
 export class BookingsService {
   constructor(private prisma: PrismaService,
     private googleMaps: GoogleMapsService,
     private tripsService: TripsService,
-    private bookingGateway: BookingGateway, 
+    private bookingGateway: AppGateway, 
   ) { }
 
   /* ================= CREATE BOOKING ================= */

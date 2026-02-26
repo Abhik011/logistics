@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { BookingGateway } from './booking.gateway';
+import { AppGateway } from './booking.gateway';
 
 @Module({
-  providers: [BookingGateway],
-  exports: [BookingGateway],   // ✅ VERY IMPORTANT
+  providers: [AppGateway],
+  exports: [AppGateway],   // ✅ VERY IMPORTANT
 })
 export class GatewayModule {}
