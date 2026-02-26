@@ -1,9 +1,9 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
-
+import { Role } from '@prisma/client';
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   @Post('login')
   login(
@@ -12,15 +12,22 @@ export class AuthController {
     return this.authService.login(body.email, body.password);
   }
   @Post('register')
-  register(
-    @Body() body: { email: string; password: string; role?: string },
-  ) {
-    return this.authService.register(
-      body.email,
-      body.password,
-      body.role || 'ADMIN',
-    );
-  }
+register(
+  @Body()
+  body: {
+    name: string;
+    email: string;
+    password: string;
+    role?: Role;
+  },
+) {
+  return this.authService.register(
+    body.name,
+    body.email,
+    body.password,
+    body.role || Role.ADMIN,
+  );
+}
 
 
 }
