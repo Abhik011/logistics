@@ -50,7 +50,7 @@ export class BookingsController {
   @Post()
   create(@Req() req: any, @Body() body: any) {
      console.log("req.user:", req.user);
-    return this.bookingsService.create(req.user.sub, body);
+    return this.bookingsService.create(req.user.id, body);
   }
 
   @Roles('ADMIN', 'SALES', 'OPERATIONS')
