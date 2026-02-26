@@ -7,12 +7,14 @@ import { BookingStatus, TripStatus, } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { GoogleMapsService } from '../common/google-maps.service';
 import { TripsService } from '../trips/trips.service';
+import { BookingGateway } from '../gateways/booking.gateway';
 
 @Injectable()
 export class BookingsService {
   constructor(private prisma: PrismaService,
     private googleMaps: GoogleMapsService,
     private tripsService: TripsService,
+    private bookingGateway: BookingGateway, 
   ) { }
 
   /* ================= CREATE BOOKING ================= */
@@ -23,9 +25,7 @@ export class BookingsService {
         'Pickup and delivery required',
       );
     }
-
     /* ================= FIND OR CREATE ROUTE ================= */
-
     let route = await this.prisma.route.findFirst({
       where: {
         origin: data.pickupAddress.trim(),
@@ -51,7 +51,7 @@ export class BookingsService {
       });
     }
 
-    const distanceKm = route.distanceKm || 0;
+    const distanceKm = route.distanceKm || 50;
 
     /* ================= GET RATE CONTRACT ================= */
 

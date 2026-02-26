@@ -19,12 +19,13 @@ import { CommonModule } from './common/common.module';
 import { DriverModule } from './driver/driver.module';
 import { DriverAuthModule } from './driver-auth/driver-auth.module';
 import { VehicleModule } from './vehicle/vehicle.module';
+import { BookingGateway } from './gateways/booking.gateway';
 
 @Module({
   imports: [UsersModule, AuthModule, CustomersModule, BookingsModule, TripsModule, InvoicesModule,
   PaymentsModule, DashboardModule , ScheduleModule.forRoot(),DriverModule,DriverAuthModule,VehicleModule,
   CronModule, FinanceModule, RoutesModule,CommonModule], 
   controllers: [AppController],
-  providers: [AppService, FinanceCronService, GoogleMapsService,],
+  providers: [AppService, FinanceCronService, GoogleMapsService,BookingGateway,],
 })
 export class AppModule {}
