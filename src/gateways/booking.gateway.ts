@@ -10,14 +10,13 @@ import { Server } from 'socket.io';
     origin: true,
     credentials: true,
   },
-  transports: ['websocket'],   // 🚀 force websocket only
 })
-export class BookingGateway implements OnGatewayInit {
+export class AppGateway implements OnGatewayInit {
   @WebSocketServer()
   server: Server;
 
   afterInit() {
-    console.log('✅ Booking WebSocket Gateway Initialized');
+    console.log('✅ WebSocket Gateway Initialized');
   }
 
   emitBookingCreated(booking: any) {
@@ -26,5 +25,9 @@ export class BookingGateway implements OnGatewayInit {
 
   emitBookingUpdated(booking: any) {
     this.server.emit('booking-updated', booking);
+  }
+
+  emitTripUpdated(trip: any) {
+    this.server.emit('trip-updated', trip);
   }
 }
