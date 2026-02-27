@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TripStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { TripsGateway } from './trip.gateway';
-
+import { BookingStatus } from '@prisma/client';
 @Injectable()
 export class TripsService {
   constructor(private prisma: PrismaService,
@@ -19,7 +19,7 @@ export class TripsService {
         trips: {
           none: {
             status: {
-              in: ['DISPATCHED', 'IN_TRANSIT'],
+             in: [TripStatus.DISPATCHED, TripStatus.IN_TRANSIT],
             },
           },
         },
@@ -40,7 +40,7 @@ export class TripsService {
         tripNumber: `TR-${randomUUID().slice(0, 8)}`,
         startDate: new Date(data.startDate),
         driverId: freeDriver.id,
-        status: 'PLANNED',
+       status: TripStatus.PLANNED,
       },
       include: {
         driver: true,
@@ -49,7 +49,7 @@ export class TripsService {
 
     });
 
-    this.gateway.server.emit('trip-created', trip);
+    this.gateway.emitTripCreated(trip);
 
     return trip;
   }
@@ -123,7 +123,7 @@ async addFuel(
       where: { id: { in: bookingIds } },
       data: {
         tripId: tripId,
-        status: 'PLANNED',
+        status: TripStatus.PLANNED,
       },
     });
 
@@ -194,7 +194,7 @@ async addFuel(
       });
     }
 
-    this.gateway.server.emit('trip-location-updated', location);
+   this.gateway.emitTripLocationUpdated(location);
 
     return location;
   }
@@ -385,50 +385,74 @@ async addFuel(
       orderBy: { createdAt: 'desc' },
     });
   }
-  async updateStatus(tripId: string, newStatus: TripStatus) {
-    const trip = await this.prisma.trip.findUnique({
-      where: { id: tripId },
-      include: { bookings: true },
-    });
+ async updateStatus(tripId: string, newStatus: TripStatus) {
+  const trip = await this.prisma.trip.findUnique({
+    where: { id: tripId },
+    include: { bookings: true },
+  });
 
-    if (!trip) {
-      throw new BadRequestException('Trip not found');
-    }
-
-    await this.prisma.trip.update({
-      where: { id: tripId },
-      data: { status: newStatus },
-    });
-
-    // Sync booking status
-    let bookingStatus;
-
-    switch (newStatus) {
-      case 'DISPATCHED':
-        bookingStatus = 'DISPATCHED';
-        break;
-      case 'IN_TRANSIT':
-        bookingStatus = 'IN_TRANSIT';
-        break;
-      case 'COMPLETED':
-        bookingStatus = 'COMPLETED';
-        break;
-      default:
-        return trip;
-    }
-
-    await this.prisma.booking.updateMany({
-      where: { tripId: tripId },
-      data: { status: bookingStatus },
-    });
-    if (newStatus === 'COMPLETED') {
-      await this.calculateInternalCost(tripId);
-      await this.calculateCustomerRevenue(tripId);
-      await this.calculateProfit(tripId);
-      await this.generateInvoiceFromTrip(tripId);
-    }
-    return { message: 'Trip and bookings updated successfully' };
+  if (!trip) {
+    throw new BadRequestException('Trip not found');
   }
+
+  // 🔥 Allowed transitions
+const allowedTransitions: Record<TripStatus, TripStatus[]> = {
+  [TripStatus.PLANNED]: [TripStatus.DISPATCHED],
+  [TripStatus.DISPATCHED]: [TripStatus.IN_TRANSIT],
+  [TripStatus.IN_TRANSIT]: [TripStatus.DELIVERED],
+  [TripStatus.DELIVERED]: [],
+  [TripStatus.COMPLETED]: [],
+  [TripStatus.CANCELLED]: [],
+};
+
+  if (!allowedTransitions[trip.status]?.includes(newStatus)) {
+    throw new BadRequestException(
+      `Invalid transition from ${trip.status} to ${newStatus}`,
+    );
+  }
+
+  // ✅ Update trip status
+  await this.prisma.trip.update({
+    where: { id: tripId },
+    data: { status: newStatus },
+  });
+
+  // 🔥 If delivered → complete everything
+  if (newStatus === TripStatus.DELIVERED) {
+
+    // 1️⃣ Update all bookings
+    await this.prisma.booking.updateMany({
+      where: { tripId },
+      data: { status: 'DELIVERED' }, // or BookingStatus.DELIVERED
+    });
+
+    // 2️⃣ Calculate costs
+    await this.calculateInternalCost(tripId);
+    await this.calculateCustomerRevenue(tripId);
+    await this.calculateProfit(tripId);
+
+    // 3️⃣ Generate invoice
+    await this.generateInvoiceFromTrip(tripId);
+
+    // 4️⃣ Free the driver
+    if (trip.driverId) {
+      await this.prisma.driver.update({
+        where: { id: trip.driverId },
+        data: {
+          isActive: true,  // or isAvailable: true (depends on your schema)
+        },
+      });
+    }
+  }
+
+  // 🔥 Emit update
+  this.gateway.emitTripUpdated({
+    tripId,
+    status: newStatus,
+  });
+
+  return { message: 'Trip completed successfully' };
+}
   async generateInvoiceFromTrip(tripId: string) {
     const trip = await this.prisma.trip.findUnique({
       where: { id: tripId },

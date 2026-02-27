@@ -15,7 +15,11 @@ export class DriverService {
             where: {
                 driverId: driverId,
                 status: {
-                    in: ['PLANNED', 'DISPATCHED', 'IN_TRANSIT'],
+                  in: [
+  TripStatus.PLANNED,
+  TripStatus.DISPATCHED,
+  TripStatus.IN_TRANSIT,
+],
                 },
             },
             include: {
