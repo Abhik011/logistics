@@ -10,13 +10,13 @@ export class InvoicesService {
         const bookings = await this.prisma.booking.findMany({
             where: {
                 id: { in: bookingIds },
-                status: { in: ['DELIVERED', 'COMPLETED'] },
+                status: { in: ['COMPLETED', 'COMPLETED'] },
                 invoiceId: null,
             },
         });
 
         if (!bookings.length) {
-            throw new BadRequestException('No eligible delivered bookings found');
+            throw new BadRequestException('No eligible COMPLETED bookings found');
         }
 
         // Example freight calculation (simple demo logic)

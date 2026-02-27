@@ -129,9 +129,9 @@ export class BookingsService {
       CREATED: ['PLANNED', 'CANCELLED'],
       PLANNED: ['DISPATCHED'],
       DISPATCHED: ['IN_TRANSIT'],
-      IN_TRANSIT: ['DELIVERED'],
-      DELIVERED: ['COMPLETED'],
-      COMPLETED: [],
+      IN_TRANSIT: ['COMPLETED'],
+      COMPLETED: ['COMPLETED'],
+      DELIVERED: [],
       CANCELLED: [],
     };
 
@@ -204,7 +204,7 @@ if (updatedBooking.tripId) {
       tripStatus = 'IN_TRANSIT';
       break;
 
-    case 'DELIVERED':
+    case 'COMPLETED':
     case 'COMPLETED':
       tripStatus = 'COMPLETED';
       break;

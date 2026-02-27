@@ -3,7 +3,7 @@ import { DriverService } from './driver.service';
 import { UpdateLocationDto, FuelEntryDto, ExpenseDto } from './driver.dto';
 import { UseGuards, Req } from '@nestjs/common';
 import { DriverJwtAuthGuard } from '../driver-auth/driver-jwt-auth.guard';
-
+import { TripStatus } from '@prisma/client';
 @Controller('driver')
 @UseGuards(DriverJwtAuthGuard)
 export class DriverController {
@@ -57,7 +57,7 @@ export class DriverController {
         return this.driverService.updateTripStatus(
             tripId,
             req.user.sub,
-            status,
+            status as TripStatus,
         );
     }
 }

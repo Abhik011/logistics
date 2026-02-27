@@ -174,7 +174,10 @@ export class DriverService {
   }
 
   // 🔥 Only allow valid status change
-  const allowed = ["IN_TRANSIT", "DELIVERED"];
+const allowed: TripStatus[] = [
+  TripStatus.IN_TRANSIT,
+  TripStatus.DELIVERED,
+];
 
   if (!allowed.includes(status)) {
     throw new BadRequestException("Invalid status");

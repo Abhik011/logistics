@@ -411,7 +411,7 @@ async addFuel(
         bookingStatus = 'IN_TRANSIT';
         break;
       case 'COMPLETED':
-        bookingStatus = 'DELIVERED';
+        bookingStatus = 'COMPLETED';
         break;
       default:
         return trip;

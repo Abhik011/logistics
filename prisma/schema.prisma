@@ -77,8 +77,8 @@ enum BookingStatus {
   PLANNED
   DISPATCHED
   IN_TRANSIT
-  DELIVERED
   COMPLETED
+  DELIVERED
   CANCELLED
 }
 
@@ -122,6 +122,8 @@ enum TripStatus {
   IN_TRANSIT
   COMPLETED
   CANCELLED
+  DELIVERED
+  
 }
 
 model Trip {
