@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateLocationDto, FuelEntryDto, ExpenseDto } from './driver.dto';
-
+import { TripStatus } from '@prisma/client';
 @Injectable()
 export class DriverService {
     constructor(private prisma: PrismaService) { }
@@ -160,7 +160,7 @@ export class DriverService {
    async updateTripStatus(
   tripId: string,
   driverId: string,
-  status: string,
+  status: TripStatus,
 ) {
   const trip = await this.prisma.trip.findFirst({
     where: {
