@@ -140,6 +140,7 @@ model Trip {
   driver   Driver? @relation(fields: [driverId], references: [id])
 
   totalDistanceKm Float?
+  distanceCovered Float          @default(0)
   // ✅ ADD THESE LINES
   locations       TripLocation[]
   expenses        TripExpense[]
@@ -272,7 +273,7 @@ model Driver {
   walletBalance     Float        @default(0)
   driverRates       DriverRate[]
   isActive          Boolean      @default(true)
-  
+
   trips Trip[]
 
   createdAt DateTime @default(now())

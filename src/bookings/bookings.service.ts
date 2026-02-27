@@ -213,10 +213,10 @@ if (updatedBooking.tripId) {
       tripStatus = 'PLANNED';
   }
 
-  await this.prisma.trip.update({
-    where: { id: updatedBooking.tripId },
-    data: { status: tripStatus },
-  });
+await this.tripsService.updateStatus(
+  updatedBooking.tripId,
+  tripStatus,
+);
 }
 
     return updatedBooking;

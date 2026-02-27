@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Trip" ADD COLUMN     "distanceCovered" DOUBLE PRECISION NOT NULL DEFAULT 0;

@@ -28,44 +28,74 @@ export class DriverService {
     }
     /* ================= LIVE LOCATION ================= */
 
-    async updateLocation(
-        tripId: string,
-        driverId: string,
-        data: UpdateLocationDto,
-    ) {
-        console.log("TripId:", tripId);
-        console.log("DriverId:", driverId);
-        console.log("Body:", data);
+   async updateLocation(
+  tripId: string,
+  driverId: string,
+  data: UpdateLocationDto,
+) {
+  const trip = await this.prisma.trip.findFirst({
+    where: {
+      id: tripId,
+      driverId: driverId,
+    },
+  });
 
-        // ✅ Check trip exists AND belongs to this driver
-        const trip = await this.prisma.trip.findFirst({
-            where: {
-                id: tripId,
-                driverId: driverId,
-            },
-        });
+  if (!trip) {
+    throw new BadRequestException("Trip not found or not assigned to driver");
+  }
 
-        console.log("Trip found:", trip);
+  if (!["DISPATCHED", "IN_TRANSIT"].includes(trip.status)) {
+    throw new BadRequestException("Trip not active");
+  }
 
-        if (!trip) {
-            throw new BadRequestException("Trip not found or not assigned to driver");
-        }
+  // 🔥 Get last location
+  const lastLocation = await this.prisma.tripLocation.findFirst({
+    where: { tripId },
+    orderBy: { createdAt: "desc" },
+  });
 
-        // ✅ Optional: Only allow tracking when trip is active
-        if (!["DISPATCHED", "IN_TRANSIT"].includes(trip.status)) {
-            throw new BadRequestException("Trip not active");
-        }
+  let distance = 0;
 
-        return this.prisma.tripLocation.create({
-            data: {
-                tripId: trip.id,
-                latitude: Number(data.latitude),
-                longitude: Number(data.longitude),
-                speed: Number(data.speed ?? 0),
-                heading: Number(data.heading ?? 0),
-            },
-        });
-    }
+  if (lastLocation) {
+    const R = 6371000;
+    const toRad = (val: number) => (val * Math.PI) / 180;
+
+    const dLat = toRad(data.latitude - lastLocation.latitude);
+    const dLon = toRad(data.longitude - lastLocation.longitude);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lastLocation.latitude)) *
+        Math.cos(toRad(data.latitude)) *
+        Math.sin(dLon / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    distance = R * c;
+  }
+
+  // 🔥 Save location
+  await this.prisma.tripLocation.create({
+    data: {
+      tripId,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      speed: data.speed ?? 0,
+      heading: data.heading ?? 0,
+    },
+  });
+
+  // 🔥 Update trip total distance
+  await this.prisma.trip.update({
+    where: { id: tripId },
+    data: {
+      distanceCovered: {
+        increment: distance,
+      },
+    },
+  });
+
+  return { message: "Location updated" };
+}
 
     /* ================= FUEL ENTRY ================= */
 
@@ -127,25 +157,32 @@ export class DriverService {
 
     /* ================= UPDATE STATUS ================= */
 
-    async updateTripStatus(
-        tripId: string,
-        driverId: string,
-        status: any,
-    ) {
-        const trip = await this.prisma.trip.findFirst({
-            where: {
-                id: tripId,
-                driverId: driverId,
-            },
-        });
+   async updateTripStatus(
+  tripId: string,
+  driverId: string,
+  status: string,
+) {
+  const trip = await this.prisma.trip.findFirst({
+    where: {
+      id: tripId,
+      driverId,
+    },
+  });
 
-        if (!trip) {
-            throw new BadRequestException("Trip not found");
-        }
+  if (!trip) {
+    throw new BadRequestException("Trip not found");
+  }
 
-        return this.prisma.trip.update({
-            where: { id: tripId },
-            data: { status },
-        });
-    }
+  // 🔥 Only allow valid status change
+  const allowed = ["IN_TRANSIT", "DELIVERED"];
+
+  if (!allowed.includes(status)) {
+    throw new BadRequestException("Invalid status");
+  }
+
+  return this.prisma.trip.update({
+    where: { id: tripId },
+    data: { status },
+  });
+}
 }
