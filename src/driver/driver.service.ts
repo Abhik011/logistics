@@ -4,164 +4,163 @@ import { UpdateLocationDto, FuelEntryDto, ExpenseDto } from './driver.dto';
 import { TripStatus } from '@prisma/client';
 @Injectable()
 export class DriverService {
-    constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) { }
 
-    /* ================= MY TRIPS ================= */
+  /* ================= MY TRIPS ================= */
 
-    async getDriverTrips(driverId: string) {
-        console.log("Driver ID received:", driverId);
+  async getDriverTrips(driverId: string) {
+    console.log("Driver ID received:", driverId);
 
-        return this.prisma.trip.findMany({
-            where: {
-                driverId: driverId,
-                status: {
-                  in: [
-  TripStatus.PLANNED,
-  TripStatus.DISPATCHED,
-  TripStatus.IN_TRANSIT,
-],
-                },
-            },
-            include: {
-                vehicle: true,
-            },
-            orderBy: {
-                startDate: 'desc',
-            },
-        });
+    return this.prisma.trip.findMany({
+      where: {
+        driverId: driverId,
+        status: {
+          in: [
+            TripStatus.PLANNED,
+            TripStatus.DISPATCHED,
+            TripStatus.IN_TRANSIT,
+          ],
+        },
+      },
+      include: {
+        vehicle: true,
+      },
+      orderBy: {
+        startDate: 'desc',
+      },
+    });
+  }
+  /* ================= LIVE LOCATION ================= */
+
+  async updateLocation(
+    tripId: string,
+    driverId: string,
+    data: UpdateLocationDto,
+  ) {
+    const trip = await this.prisma.trip.findFirst({
+      where: {
+        id: tripId,
+        driverId: driverId,
+      },
+    });
+
+    if (!trip) {
+      throw new BadRequestException("Trip not found or not assigned to driver");
     }
-    /* ================= LIVE LOCATION ================= */
 
-   async updateLocation(
-  tripId: string,
-  driverId: string,
-  data: UpdateLocationDto,
-) {
-  const trip = await this.prisma.trip.findFirst({
-    where: {
-      id: tripId,
-      driverId: driverId,
-    },
-  });
+    if (!["DISPATCHED", "IN_TRANSIT"].includes(trip.status)) {
+      throw new BadRequestException("Trip not active");
+    }
 
-  if (!trip) {
-    throw new BadRequestException("Trip not found or not assigned to driver");
-  }
+    // 🔥 Get last location
+    const lastLocation = await this.prisma.tripLocation.findFirst({
+      where: { tripId },
+      orderBy: { createdAt: "desc" },
+    });
 
-  if (!["DISPATCHED", "IN_TRANSIT"].includes(trip.status)) {
-    throw new BadRequestException("Trip not active");
-  }
+    let distance = 0;
 
-  // 🔥 Get last location
-  const lastLocation = await this.prisma.tripLocation.findFirst({
-    where: { tripId },
-    orderBy: { createdAt: "desc" },
-  });
+    if (lastLocation) {
+      const R = 6371000;
+      const toRad = (val: number) => (val * Math.PI) / 180;
 
-  let distance = 0;
+      const dLat = toRad(data.latitude - lastLocation.latitude);
+      const dLon = toRad(data.longitude - lastLocation.longitude);
 
-  if (lastLocation) {
-    const R = 6371000;
-    const toRad = (val: number) => (val * Math.PI) / 180;
-
-    const dLat = toRad(data.latitude - lastLocation.latitude);
-    const dLon = toRad(data.longitude - lastLocation.longitude);
-
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lastLocation.latitude)) *
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lastLocation.latitude)) *
         Math.cos(toRad(data.latitude)) *
         Math.sin(dLon / 2) ** 2;
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    distance = R * c;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      distance = R * c;
+    }
+
+    // 🔥 Save location
+    await this.prisma.tripLocation.create({
+      data: {
+        tripId,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        speed: data.speed ?? 0,
+        heading: data.heading ?? 0,
+      },
+    });
+
+    // 🔥 Update trip total distance
+    await this.prisma.trip.update({
+      where: { id: tripId },
+      data: {
+        distanceCovered: {
+          increment: distance,
+        },
+      },
+    });
+
+    return { message: "Location updated" };
   }
 
-  // 🔥 Save location
-  await this.prisma.tripLocation.create({
-    data: {
-      tripId,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      speed: data.speed ?? 0,
-      heading: data.heading ?? 0,
-    },
-  });
+  /* ================= FUEL ENTRY ================= */
 
-  // 🔥 Update trip total distance
-  await this.prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      distanceCovered: {
-        increment: distance,
+  async addFuel(tripId: string, vehicleId: string, data: FuelEntryDto) {
+    const amount = data.litres * data.ratePerLitre;
+
+    await this.prisma.fuelEntry.create({
+      data: {
+        tripId,
+        vehicleId,
+        litres: data.litres,
+        ratePerLitre: data.ratePerLitre,
+        amount,
+        odometer: data.odometer,
+        entryDate: new Date(),
       },
-    },
-  });
+    });
 
-  return { message: "Location updated" };
-}
+    await this.updateTripCost(tripId, amount);
 
-    /* ================= FUEL ENTRY ================= */
+    return { message: 'Fuel entry added' };
+  }
 
-    async addFuel(tripId: string, vehicleId: string, data: FuelEntryDto) {
-        const amount = data.litres * data.ratePerLitre;
+  /* ================= EXPENSE ENTRY ================= */
 
-        await this.prisma.fuelEntry.create({
-            data: {
-                tripId,
-                vehicleId,
-                litres: data.litres,
-                ratePerLitre: data.ratePerLitre,
-                amount,
-                odometer: data.odometer,
-                entryDate: new Date(),
-            },
-        });
+  async addExpense(tripId: string, data: ExpenseDto) {
+    await this.prisma.tripExpense.create({
+      data: {
+        tripId,
+        type: data.type as any,
+        amount: data.amount,
+        description: data.description,
+        expenseDate: new Date(),
+      },
+    });
 
-        await this.updateTripCost(tripId, amount);
+    await this.updateTripCost(tripId, data.amount);
 
-        return { message: 'Fuel entry added' };
-    }
+    return { message: 'Expense added' };
+  }
 
-    /* ================= EXPENSE ENTRY ================= */
+  /* ================= UPDATE TRIP COST ================= */
 
-    async addExpense(tripId: string, data: ExpenseDto) {
-        await this.prisma.tripExpense.create({
-            data: {
-                tripId,
-                type: data.type as any,
-                amount: data.amount,
-                description: data.description,
-                expenseDate: new Date(),
-            },
-        });
+  private async updateTripCost(tripId: string, additionalCost: number) {
+    const trip = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+    });
 
-        await this.updateTripCost(tripId, data.amount);
+    const newCost = (trip?.actualCost || 0) + additionalCost;
 
-        return { message: 'Expense added' };
-    }
+    await this.prisma.trip.update({
+      where: { id: tripId },
+      data: {
+        actualCost: newCost,
+        profit: (trip?.revenue || 0) - newCost,
+      },
+    });
+  }
 
-    /* ================= UPDATE TRIP COST ================= */
-
-    private async updateTripCost(tripId: string, additionalCost: number) {
-        const trip = await this.prisma.trip.findUnique({
-            where: { id: tripId },
-        });
-
-        const newCost = (trip?.actualCost || 0) + additionalCost;
-
-        await this.prisma.trip.update({
-            where: { id: tripId },
-            data: {
-                actualCost: newCost,
-                profit: (trip?.revenue || 0) - newCost,
-            },
-        });
-    }
-
-    /* ================= UPDATE STATUS ================= */
-
-   async updateTripStatus(
+  /* ================= UPDATE STATUS ================= */
+ async updateTripStatus(
   tripId: string,
   driverId: string,
   status: TripStatus,
@@ -171,25 +170,44 @@ export class DriverService {
       id: tripId,
       driverId,
     },
+    include: {
+      bookings: true,
+    },
   });
 
   if (!trip) {
     throw new BadRequestException("Trip not found");
   }
 
-  // 🔥 Only allow valid status change
-const allowed: TripStatus[] = [
-  TripStatus.IN_TRANSIT,
-  TripStatus.DELIVERED,
-];
+  // 🔥 Define allowed transitions
+  const allowedTransitions: Record<TripStatus, TripStatus[]> = {
+    PLANNED: [],
+    DISPATCHED: [TripStatus.IN_TRANSIT],
+    IN_TRANSIT: [TripStatus.COMPLETED],
+    COMPLETED: [],
+    CANCELLED: [],
+    DELIVERED: [],
+  };
 
-  if (!allowed.includes(status)) {
-    throw new BadRequestException("Invalid status");
+  if (!allowedTransitions[trip.status].includes(status)) {
+    throw new BadRequestException(
+      `Cannot change status from ${trip.status} to ${status}`
+    );
   }
 
-  return this.prisma.trip.update({
+  const updatedTrip = await this.prisma.trip.update({
     where: { id: tripId },
     data: { status },
   });
+
+  // 🔥 Auto mark bookings as DELIVERED when trip completes
+  if (status === TripStatus.COMPLETED) {
+    await this.prisma.booking.updateMany({
+      where: { tripId },
+      data: { status: "DELIVERED" },
+    });
+  }
+
+  return updatedTrip;
 }
 }
