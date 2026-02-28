@@ -453,7 +453,7 @@ export class TripsService {
     });
 
     // 🔥 If delivered → complete everything
-    if (newStatus === TripStatus.DELIVERED) {
+   if (newStatus === TripStatus.COMPLETED) {
 
       // 1️⃣ Update all bookings
       await this.prisma.booking.updateMany({
