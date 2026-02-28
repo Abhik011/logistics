@@ -397,12 +397,22 @@ async addFuel(
 
   // 🔥 Allowed transitions
 const allowedTransitions: Record<TripStatus, TripStatus[]> = {
-  [TripStatus.PLANNED]: [TripStatus.DISPATCHED],
-  [TripStatus.DISPATCHED]: [TripStatus.IN_TRANSIT],
-  [TripStatus.IN_TRANSIT]: [TripStatus.DELIVERED],
-  [TripStatus.DELIVERED]: [],
-  [TripStatus.COMPLETED]: [],
-  [TripStatus.CANCELLED]: [],
+  PLANNED: [TripStatus.DISPATCHED],
+
+  DISPATCHED: [
+    TripStatus.IN_TRANSIT,
+    TripStatus.CANCELLED,
+  ],
+
+  IN_TRANSIT: [
+    TripStatus.COMPLETED,
+  ],
+
+  COMPLETED: [],
+
+  CANCELLED: [],
+
+  DELIVERED: [],
 };
 
   if (!allowedTransitions[trip.status]?.includes(newStatus)) {
