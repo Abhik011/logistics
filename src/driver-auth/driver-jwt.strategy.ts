@@ -16,7 +16,7 @@ super({
   }
 
   async validate(payload: any) {
-    //  console.log("JWT PAYLOAD:", payload);
+     console.log("JWT PAYLOAD:", payload);
     return {
       sub: payload.sub,
       role: payload.role,
