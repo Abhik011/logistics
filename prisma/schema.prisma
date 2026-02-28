@@ -126,31 +126,31 @@ enum TripStatus {
 }
 
 model Trip {
-  id         String     @id @default(uuid())
-  tripNumber String     @unique
-  startDate  DateTime
-  endDate    DateTime?
-  status     TripStatus @default(PLANNED)
-
-  bookings Booking[]
-
-  vehicleId String?
-  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
-
-  driverId String?
-  driver   Driver? @relation(fields: [driverId], references: [id])
-
-  totalDistanceKm Float?
-  distanceCovered Float          @default(0)
+  id                  String         @id @default(uuid())
+  tripNumber          String         @unique
+  startDate           DateTime
+  endDate             DateTime?
+  status              TripStatus     @default(PLANNED)
+  bookings            Booking[]
+  vehicleId           String?
+  vehicle             Vehicle?       @relation(fields: [vehicleId], references: [id])
+  driverId            String?
+  driver              Driver?        @relation(fields: [driverId], references: [id])
+  totalDistanceKm     Float?
+  distanceCovered     Float          @default(0)
   // ✅ ADD THESE LINES
-  locations       TripLocation[]
-  expenses        TripExpense[]
-  fuelEntries     FuelEntry[]
-
-  estimatedCost Float?
-  actualCost    Float?
-  revenue       Float?
-  profit        Float?
+  locations           TripLocation[]
+  expenses            TripExpense[]
+  fuelEntries         FuelEntry[]
+  totalCost           Float?         @default(0)
+  profitMarginPercent Float?         @default(20)
+  profitMargin        Float? // 20 or 40
+  mileage             Float? // vehicle km per litre
+  dieselPrice         Float? // system diesel price
+  estimatedCost       Float?
+  actualCost          Float?
+  revenue             Float?
+  profit              Float?
 
   startLatitude  Float?
   startLongitude Float?
