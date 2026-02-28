@@ -54,40 +54,40 @@ export class TripsService {
     return trip;
   }
   async findOne(id: string) {
-  const trip = await this.prisma.trip.findUnique({
-    where: { id },
-    include: {
-      driver: true,
-      vehicle: true,
-      fuelEntries: true,
-      bookings: true,
-      expenses: true,
-    },
-  });
+    const trip = await this.prisma.trip.findUnique({
+      where: { id },
+      include: {
+        driver: true,
+        vehicle: true,
+        fuelEntries: true,
+        bookings: true,
+        expenses: true,
+      },
+    });
 
-  if (!trip) throw new BadRequestException('Trip not found');
+    if (!trip) throw new BadRequestException('Trip not found');
 
-  const runningCost =
-    (trip.totalDistanceKm || 0) *
-    (trip.vehicle?.costPerKm || 0);
+    const runningCost =
+      (trip.totalDistanceKm || 0) *
+      (trip.vehicle?.costPerKm || 0);
 
-  const fuelCost = trip.fuelEntries.reduce(
-    (sum, f) => sum + f.amount,
-    0,
-  );
+    const fuelCost = trip.fuelEntries.reduce(
+      (sum, f) => sum + f.amount,
+      0,
+    );
 
-  const expenseCost = trip.expenses?.reduce(
-    (sum, e) => sum + e.amount,
-    0,
-  ) || 0;
+    const expenseCost = trip.expenses?.reduce(
+      (sum, e) => sum + e.amount,
+      0,
+    ) || 0;
 
-  const actualCost = runningCost + fuelCost + expenseCost;
+    const actualCost = runningCost + fuelCost + expenseCost;
 
-  return {
-    ...trip,
-    actualCost,
-  };
-}
+    return {
+      ...trip,
+      actualCost,
+    };
+  }
 
   async addFuel(
     tripId: string,
@@ -207,7 +207,7 @@ export class TripsService {
       await this.prisma.trip.update({
         where: { id },
         data: {
-          totalDistanceKm: {
+          distanceCovered: {
             increment: distance,
           },
         },
@@ -240,7 +240,7 @@ export class TripsService {
       throw new Error('Vehicle cost per KM not defined');
     }
 
-    const totalKm = trip.totalDistanceKm || 0;
+    const totalKm = trip.totalDistanceKm ?? trip.distanceCovered ?? 0;
     const costPerKm = trip.vehicle.costPerKm || 0;
 
     // 1️⃣ Running Cost
@@ -307,7 +307,7 @@ export class TripsService {
       throw new Error('Vehicle cost per KM not defined');
     }
 
-    const totalKm = trip.totalDistanceKm || 0;
+    const totalKm = trip.totalDistanceKm ?? trip.distanceCovered ?? 0;
     const runningCost = totalKm * trip.vehicle.costPerKm;
 
     const fuelCost = trip.fuelEntries.reduce(
@@ -364,7 +364,7 @@ export class TripsService {
       0,
     );
 
-    const totalKm = trip.totalDistanceKm || 0;
+    const totalKm = trip.totalDistanceKm ?? trip.distanceCovered ?? 0;
 
     let revenue = 0;
 
