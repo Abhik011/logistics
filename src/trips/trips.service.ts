@@ -53,41 +53,22 @@ export class TripsService {
 
     return trip;
   }
-  async findOne(id: string) {
-    const trip = await this.prisma.trip.findUnique({
-      where: { id },
-      include: {
-        driver: true,
-        vehicle: true,
-        fuelEntries: true,
-        bookings: true,
-        expenses: true,
-      },
-    });
+ async findOne(id: string) {
+  const trip = await this.prisma.trip.findUnique({
+    where: { id },
+    include: {
+      driver: true,
+      vehicle: true,
+      fuelEntries: true,
+      bookings: true,
+      expenses: true,
+    },
+  });
 
-    if (!trip) throw new BadRequestException('Trip not found');
+  if (!trip) throw new BadRequestException('Trip not found');
 
-    const runningCost =
-      (trip.totalDistanceKm || 0) *
-      (trip.vehicle?.costPerKm || 0);
-
-    const fuelCost = trip.fuelEntries.reduce(
-      (sum, f) => sum + f.amount,
-      0,
-    );
-
-    const expenseCost = trip.expenses?.reduce(
-      (sum, e) => sum + e.amount,
-      0,
-    ) || 0;
-
-    const actualCost = runningCost + fuelCost + expenseCost;
-
-    return {
-      ...trip,
-      actualCost,
-    };
-  }
+  return trip; // 🔥 DO NOT RECALCULATE HERE
+}
 
   async addFuel(
     tripId: string,
@@ -453,7 +434,7 @@ export class TripsService {
     });
 
     // 🔥 If delivered → complete everything
-   if (newStatus === TripStatus.COMPLETED) {
+    if (newStatus === TripStatus.COMPLETED) {
 
       // 1️⃣ Update all bookings
       await this.prisma.booking.updateMany({
