@@ -160,64 +160,84 @@ export class DriverService {
   }
 
   /* ================= UPDATE STATUS ================= */
-  async updateTripStatus(
-    tripId: string,
-    driverId: string,
-    status: TripStatus,
-  ) {
-    const trip = await this.prisma.trip.findFirst({
-      where: {
-        id: tripId,
-        driverId,
-      },
-      include: {
-        bookings: true,
-      },
-    });
+ async updateTripStatus(
+  tripId: string,
+  driverId: string,
+  status: TripStatus,
+) {
+  const trip = await this.prisma.trip.findFirst({
+    where: {
+      id: tripId,
+      driverId,
+    },
+    include: {
+      bookings: true,
+    },
+  });
 
-    if (!trip) {
-      throw new BadRequestException("Trip not found");
-    }
-
-    // 🔥 Define allowed transitions
-    const allowedTransitions: Record<TripStatus, TripStatus[]> = {
-      PLANNED: [TripStatus.DISPATCHED],
-
-      DISPATCHED: [
-        TripStatus.IN_TRANSIT,
-        TripStatus.CANCELLED,
-      ],
-
-      IN_TRANSIT: [
-        TripStatus.COMPLETED,
-      ],
-
-      COMPLETED: [],
-
-      CANCELLED: [],
-
-      DELIVERED: [],
-    };
-
-    if (!allowedTransitions[trip.status].includes(status)) {
-      throw new BadRequestException(
-        `Cannot change status from ${trip.status} to ${status}`
-      );
-    }
-
-    const updatedTrip = await this.prisma.trip.update({
-      where: { id: tripId },
-      data: { status },
-    });
-
-    // 🔥 Auto mark bookings as DELIVERED when trip completes
-    if (status === TripStatus.COMPLETED) {
-      await this.prisma.booking.updateMany({
-        where: { tripId },
-        data: { status: "DELIVERED" },
-      });
-    }
-
-    return updatedTrip;
+  if (!trip) {
+    throw new BadRequestException("Trip not found");
   }
+
+  const allowedTransitions: Record<TripStatus, TripStatus[]> = {
+    PLANNED: [TripStatus.DISPATCHED],
+
+    DISPATCHED: [
+      TripStatus.IN_TRANSIT,
+      TripStatus.CANCELLED,
+    ],
+
+    IN_TRANSIT: [
+      TripStatus.COMPLETED,
+    ],
+
+    COMPLETED: [],
+
+    CANCELLED: [],
+
+    DELIVERED: [],
+  };
+
+  if (!allowedTransitions[trip.status].includes(status)) {
+    throw new BadRequestException(
+      `Cannot change status from ${trip.status} to ${status}`
+    );
+  }
+
+  // 🔥 Update Trip
+  const updatedTrip = await this.prisma.trip.update({
+    where: { id: tripId },
+    data: { status },
+  });
+
+  // 🔥 Map Trip Status → Booking Status
+  let bookingStatus: any = null;
+
+  switch (status) {
+    case TripStatus.DISPATCHED:
+      bookingStatus = "DISPATCHED";
+      break;
+
+    case TripStatus.IN_TRANSIT:
+      bookingStatus = "IN_TRANSIT";
+      break;
+
+    case TripStatus.COMPLETED:
+      bookingStatus = "DELIVERED";
+      break;
+
+    case TripStatus.CANCELLED:
+      bookingStatus = "CANCELLED";
+      break;
+  }
+
+  if (bookingStatus) {
+    await this.prisma.booking.updateMany({
+      where: { tripId },
+      data: { status: bookingStatus },
+    });
+  }
+
+  return updatedTrip;
+}
 }
