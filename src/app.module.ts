@@ -20,9 +20,12 @@ import { DriverModule } from './driver/driver.module';
 import { DriverAuthModule } from './driver-auth/driver-auth.module';
 import { VehicleModule } from './vehicle/vehicle.module';
 import { AppGateway } from './gateways/booking.gateway';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [UsersModule, AuthModule, CustomersModule, BookingsModule, TripsModule, InvoicesModule,
+  imports: [   ConfigModule.forRoot({
+      isGlobal: true,
+    }), UsersModule, AuthModule, CustomersModule, BookingsModule, TripsModule, InvoicesModule,
   PaymentsModule, DashboardModule , ScheduleModule.forRoot(),DriverModule,DriverAuthModule,VehicleModule,
   CronModule, FinanceModule, RoutesModule,CommonModule], 
   controllers: [AppController],
