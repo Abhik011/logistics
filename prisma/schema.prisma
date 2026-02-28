@@ -123,7 +123,6 @@ enum TripStatus {
   COMPLETED
   CANCELLED
   DELIVERED
-  
 }
 
 model Trip {
@@ -152,6 +151,11 @@ model Trip {
   actualCost    Float?
   revenue       Float?
   profit        Float?
+
+  startLatitude  Float?
+  startLongitude Float?
+  endLatitude    Float?
+  endLongitude   Float?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
