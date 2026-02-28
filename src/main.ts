@@ -20,7 +20,8 @@ async function bootstrap() {
       const allowedOrigins = [
         'http://localhost:3000',
         'http://127.0.0.1:3000',
-        process.env.FRONTEND_URL, // production domain
+        process.env.FRONTEND_URL, 
+        'http://logistics-erp.duckdns.org', // production domain
       ];
 
       // Allow server-to-server or Postman requests
