@@ -2,9 +2,10 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateLocationDto, FuelEntryDto, ExpenseDto } from './driver.dto';
 import { TripStatus } from '@prisma/client';
+import { TripsService } from '../trips/trips.service';
 @Injectable()
 export class DriverService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService, private tripsService: TripsService,) { }
 
   /* ================= MY TRIPS ================= */
 
@@ -160,7 +161,7 @@ export class DriverService {
   }
 
   /* ================= UPDATE STATUS ================= */
- async updateTripStatus(
+async updateTripStatus(
   tripId: string,
   driverId: string,
   status: TripStatus,
@@ -170,74 +171,16 @@ export class DriverService {
       id: tripId,
       driverId,
     },
-    include: {
-      bookings: true,
-    },
   });
 
   if (!trip) {
-    throw new BadRequestException("Trip not found");
+    throw new BadRequestException("Trip not found or not assigned to driver");
   }
 
-  const allowedTransitions: Record<TripStatus, TripStatus[]> = {
-    PLANNED: [TripStatus.DISPATCHED],
-
-    DISPATCHED: [
-      TripStatus.IN_TRANSIT,
-      TripStatus.CANCELLED,
-    ],
-
-    IN_TRANSIT: [
-      TripStatus.COMPLETED,
-    ],
-
-    COMPLETED: [],
-
-    CANCELLED: [],
-
-    DELIVERED: [],
-  };
-
-  if (!allowedTransitions[trip.status].includes(status)) {
-    throw new BadRequestException(
-      `Cannot change status from ${trip.status} to ${status}`
-    );
-  }
-
-  // 🔥 Update Trip
-  const updatedTrip = await this.prisma.trip.update({
-    where: { id: tripId },
-    data: { status },
-  });
-
-  // 🔥 Map Trip Status → Booking Status
-  let bookingStatus: any = null;
-
-  switch (status) {
-    case TripStatus.DISPATCHED:
-      bookingStatus = "DISPATCHED";
-      break;
-
-    case TripStatus.IN_TRANSIT:
-      bookingStatus = "IN_TRANSIT";
-      break;
-
-    case TripStatus.COMPLETED:
-      bookingStatus = "DELIVERED";
-      break;
-
-    case TripStatus.CANCELLED:
-      bookingStatus = "CANCELLED";
-      break;
-  }
-
-  if (bookingStatus) {
-    await this.prisma.booking.updateMany({
-      where: { tripId },
-      data: { status: bookingStatus },
-    });
-  }
-
-  return updatedTrip;
+  // 🔥 Delegate everything to TripsService
+  return this.tripsService.updateStatus(
+    tripId,
+    status,
+  );
 }
 }
