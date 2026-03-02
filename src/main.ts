@@ -22,7 +22,7 @@ async function bootstrap() {
         'http://127.0.0.1:3000',
         process.env.FRONTEND_URL, 
         'http://logistics-erp.duckdns.org',
-        "https://creonox-speed-backend.vercel.app",// production domain
+        "https://creonox-speed.vercel.app",// production domain
       ];
 
       // Allow server-to-server or Postman requests
