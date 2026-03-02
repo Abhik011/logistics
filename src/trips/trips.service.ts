@@ -431,25 +431,25 @@ export class TripsService {
     });
 
     // 🔥 If delivered → complete everything
-   if (newStatus === TripStatus.COMPLETED) {
+    if (newStatus === TripStatus.COMPLETED) {
 
-  await this.prisma.booking.updateMany({
-    where: { tripId },
-    data: { status: 'DELIVERED' },
-  });
+      await this.prisma.booking.updateMany({
+        where: { tripId },
+        data: { status: 'DELIVERED' },
+      });
 
-  // 🔥 NEW FINANCIAL ENGINE
-  await this.calculateFinancials(tripId);
+      // 🔥 NEW FINANCIAL ENGINE
+      await this.calculateFinancials(tripId);
 
-  await this.generateInvoiceFromTrip(tripId);
+      await this.generateInvoiceFromTrip(tripId);
 
-  if (trip.driverId) {
-    await this.prisma.driver.update({
-      where: { id: trip.driverId },
-      data: { isActive: true },
-    });
-  }
-}
+      if (trip.driverId) {
+        await this.prisma.driver.update({
+          where: { id: trip.driverId },
+          data: { isActive: true },
+        });
+      }
+    }
 
     // 🔥 Emit update
     this.gateway.emitTripUpdated({
@@ -562,65 +562,69 @@ export class TripsService {
       },
     });
   }
-async calculateFinancials(tripId: string) {
-  const trip = await this.prisma.trip.findUnique({
-    where: { id: tripId },
-    include: {
-      vehicle: true,
-      expenses: true,
-    },
-  });
+  async calculateFinancials(tripId: string) {
+    const trip = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+      include: {
+        vehicle: true,
+        expenses: true,
+        bookings: true,
+      },
+    });
 
-  if (!trip || !trip.vehicle) {
-    throw new Error('Trip or vehicle not found');
+    if (!trip || !trip.vehicle) {
+      throw new Error('Trip or vehicle not found');
+    }
+
+    const totalKm =
+      trip.distanceCovered && trip.distanceCovered > 0
+        ? trip.distanceCovered
+        : trip.bookings?.reduce((sum, b) => sum + (b.distanceKm || 0), 0) || 0;
+
+    // ==============================
+    // HARD CODED SETTINGS
+    // ==============================
+    const MILEAGE = 5;       // 5 km per litre
+    const DIESEL_PRICE = 95; // ₹ per litre
+
+    // 1️⃣ Running Cost
+    const runningCost =
+      totalKm * (trip.vehicle.costPerKm || 0);
+
+    // 2️⃣ Fuel Calculation
+    const fuelLitres = totalKm / MILEAGE;
+
+    const fuelCost = fuelLitres * DIESEL_PRICE;
+
+    // 3️⃣ Other Expenses
+    const otherCost = trip.expenses.reduce(
+      (sum, e) => sum + e.amount,
+      0,
+    );
+
+    // 4️⃣ Total Cost
+    const totalCost =
+      runningCost + fuelCost + otherCost;
+
+    // 5️⃣ Margin
+    const margin =
+      trip.profitMarginPercent ?? 20;
+
+    const revenue =
+      totalCost * (1 + margin / 100);
+
+    const profit =
+      revenue - totalCost;
+
+    return this.prisma.trip.update({
+      where: { id: tripId },
+      data: {
+        totalCost,
+        revenue,
+        profit,
+      },
+    });
   }
-
-  const totalKm = trip.distanceCovered ?? 0;
-
-  // ==============================
-  // HARD CODED SETTINGS
-  // ==============================
-  const MILEAGE = 5;       // 5 km per litre
-  const DIESEL_PRICE = 95; // ₹ per litre
-
-  // 1️⃣ Running Cost
-  const runningCost =
-    totalKm * (trip.vehicle.costPerKm || 0);
-
-  // 2️⃣ Fuel Calculation
-  const fuelLitres = totalKm / MILEAGE;
-
-  const fuelCost = fuelLitres * DIESEL_PRICE;
-
-  // 3️⃣ Other Expenses
-  const otherCost = trip.expenses.reduce(
-    (sum, e) => sum + e.amount,
-    0,
-  );
-
-  // 4️⃣ Total Cost
-  const totalCost =
-    runningCost + fuelCost + otherCost;
-
-  // 5️⃣ Margin
-  const margin =
-    trip.profitMarginPercent ?? 20;
-
-  const revenue =
-    totalCost * (1 + margin / 100);
-
-  const profit =
-    revenue - totalCost;
-
-  return this.prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      totalCost,
-      revenue,
-      profit,
-    },
-  });
-}
 
   async findAll() {
     return this.prisma.trip.findMany({
